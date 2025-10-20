@@ -245,21 +245,6 @@ components:
             type: string
           example: ["cart_123", "cart_456"]
 
-    ShareWishlistResponse:
-      type: object
-      properties:
-        share_url:
-          type: string
-          format: uri
-          example: "https://zara.com/share/abc123"
-        share_token:
-          type: string
-          example: "abc123"
-        expires_at:
-          type: string
-          format: date-time
-          example: "2024-02-15T23:59:59Z"
-
     ApiResponse:
       type: object
       properties:
@@ -327,7 +312,7 @@ components:
           type: boolean
           default: true
 
-    ShareWishlistResponse:
+    UnifiedShareWishlistResponse:
       type: object
       properties:
         share_url:
@@ -752,7 +737,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ShareWishlistResponse'
+                $ref: '#/components/schemas/UnifiedShareWishlistResponse'
         '400':
           description: Configuración inválida
         '404':
