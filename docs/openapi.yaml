@@ -1,14 +1,14 @@
 openapi: 3.0.3
 info:
   title: Zara Wishlist API
-  description: API para gestión de múltiples wishlists - Segunda Iteracion
-  version: 2.0.0
+  description: API para gestión de múltiples wishlists - MVP
+  version: 1.0.0
   contact:
     name: Zara Ecommerce Team
     email: api@zara.com
 
 servers:
-  - url: https://api.zara.com/v2
+  - url: https://api.zara.com/v1
     description: Production server
 
 components:
@@ -270,76 +270,162 @@ components:
         message:
           type: string
 
-    # MODO PÚBLICO (Simple)
-    PublicWishlistView:
+    # ESQUEMAS PARA SHARING UNIFICADO
+    ShareSettings:
       type: object
       properties:
-        wishlist:
-          $ref: '#/components/schemas/Wishlist'
-        share_type:
+        mode:
           type: string
-          example: "public"
-        message:
-          type: string
-          example: "Wishlist compartida públicamente"
-
-    # MODO COLABORATIVO (Controlado)
-    CollaborativeShareResponse:
-      type: object
-      properties:
-        collaborative_url:
-          type: string
-          format: uri
-          example: "https://zara.com/collab/xyz789"
-        collaborative_token:
-          type: string
-          example: "xyz789"
-        expires_at:
-          type: string
-          format: date-time
-        settings:
-          $ref: '#/components/schemas/CollaborativeShareSettings'
-
-    CollaborativeShareSettings:
-      type: object
-      properties:
+          enum: [simple, collaborative]
+          default: simple
+          example: collaborative
         expiration_days:
           type: integer
+          minimum: 1
+          maximum: 90
+          example: 30
         max_views:
           type: integer
-        current_views:
-          type: integer
+          example: 100
         allow_comments:
           type: boolean
+          example: true
+        show_prices:
+          type: boolean
+          example: true
+        show_out_of_stock:
+          type: boolean
+          example: true
         created_at:
           type: string
           format: date-time
         is_active:
           type: boolean
+          example: true
 
-    CollaborativeWishlistView:
+    ShareWishlistRequest:
+      type: object
+      properties:
+        mode:
+          type: string
+          enum: [simple, collaborative]
+          default: simple
+        expiration_days:
+          type: integer
+          minimum: 1
+          maximum: 90
+          default: 30
+        max_views:
+          type: integer
+        allow_comments:
+          type: boolean
+          default: true
+        show_prices:
+          type: boolean
+          default: true
+        show_out_of_stock:
+          type: boolean
+          default: true
+
+    ShareWishlistResponse:
+      type: object
+      properties:
+        share_url:
+          type: string
+          format: uri
+          example: "https://zara.com/wishlist/share/abc123xyz"
+        share_token:
+          type: string
+          example: "abc123xyz"
+        settings:
+          $ref: '#/components/schemas/ShareSettings'
+        message:
+          type: string
+          example: "Wishlist compartida exitosamente"
+
+    SharedWishlistView:
       type: object
       properties:
         wishlist:
           $ref: '#/components/schemas/Wishlist'
         share_type:
           type: string
-          example: "collaborative"
+          example: "shared"
         settings:
-          $ref: '#/components/schemas/CollaborativeShareSettings'
+          $ref: '#/components/schemas/ShareSettings'
         owner_info:
           type: object
           properties:
             name:
               type: string
+              example: "María"
             initial:
               type: string
+              example: "M"
         remaining_views:
           type: integer
           example: 85
         expires_in_days:
           type: integer
           example: 15
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "comment_123"
+        user_initial:
+          type: string
+          example: "A"
+        user_name:
+          type: string
+          example: "Ana"
+        content:
+          type: string
+          example: "¡Me encanta este vestido!"
+        created_at:
+          type: string
+          format: date-time
+          example: "2024-01-20T10:30:00Z"
+
+    AddCommentRequest:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          maxLength: 500
+          example: "¡Me encanta este producto!"
+
+    CommentList:
+      type: object
+      properties:
+        comments:
+          type: array
+          items:
+            $ref: '#/components/schemas/Comment'
+        total_count:
+          type: integer
+          example: 5
+
+    ShareStats:
+      type: object
+      properties:
+        total_views:
+          type: integer
+          example: 42
+        total_shares:
+          type: integer
+          example: 8
+        total_comments:
+          type: integer
+          example: 5
+        last_accessed:
+          type: string
+          format: date-time
+          example: "2024-01-20T15:30:00Z"
 
 paths:
   # =============================================
@@ -638,62 +724,14 @@ paths:
           description: Wishlist no encontrada
 
   # =============================================
-  # WISHLIST SHARING - DOS MODOS DIFERENCIADOS
+  # WISHLIST SHARING UNIFICADO
   # =============================================
 
-  # MODO 1: COMPARTIR SIMPLE (Enlace Público)
-  /wishlists/{wishlist_id}/share/public:
+  # GESTIÓN DE COMPARTIR
+  /wishlists/{wishlist_id}/share:
     post:
-      summary: Generar enlace público de sharing
-      description: Crea un enlace público permanente para compartir la wishlist (modo simple)
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: wishlist_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Enlace público generado exitosamente
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  public_url:
-                    type: string
-                    format: uri
-                    example: "https://zara.com/wishlist/abc123"
-                  message:
-                    type: string
-                    example: "Enlace público generado - Cualquiera con el enlace puede ver"
-
-    delete:
-      summary: Desactivar enlace público
-      description: Desactiva el enlace público de la wishlist
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: wishlist_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Enlace público desactivado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-
-  # MODO 2: COLABORACIÓN CONTROLADA
-  /wishlists/{wishlist_id}/share/collaborative:
-    post:
-      summary: Crear enlace colaborativo controlado
-      description: Genera un enlace con expiración y controls para colaboración básica
+      summary: Compartir wishlist
+      description: Crea un enlace para compartir la wishlist con configuraciones flexibles (simple o colaborativo)
       security:
         - bearerAuth: []
       parameters:
@@ -707,32 +745,22 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                expiration_days:
-                  type: integer
-                  minimum: 1
-                  maximum: 90
-                  default: 30
-                  example: 30
-                max_views:
-                  type: integer
-                  minimum: 1
-                  example: 100
-                allow_comments:
-                  type: boolean
-                  example: false
+              $ref: '#/components/schemas/ShareWishlistRequest'
       responses:
         '201':
-          description: Enlace colaborativo creado exitosamente
+          description: Wishlist compartida exitosamente
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CollaborativeShareResponse'
+                $ref: '#/components/schemas/ShareWishlistResponse'
+        '400':
+          description: Configuración inválida
+        '404':
+          description: Wishlist no encontrada
 
     get:
-      summary: Obtener configuración colaborativa
-      description: Retorna la configuración actual del enlace colaborativo
+      summary: Obtener configuración de sharing
+      description: Retorna la configuración actual del sharing de la wishlist
       security:
         - bearerAuth: []
       parameters:
@@ -743,87 +771,152 @@ paths:
             type: string
       responses:
         '200':
-          description: Configuración colaborativa obtenida
+          description: Configuración obtenida exitosamente
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CollaborativeShareSettings'
+                $ref: '#/components/schemas/ShareSettings'
+        '404':
+          description: Wishlist no encontrada o no compartida
 
-    delete:
-      summary: Revocar enlace colaborativo
-      description: Revoca inmediatamente el enlace colaborativo
+    put:
+      summary: Actualizar configuración de sharing
+      description: Actualiza la configuración del sharing de la wishlist
       security:
         - bearerAuth: []
       parameters:
         - name: wishlist_id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Enlace colaborativo revocado
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ApiResponse'
-
-  # ACCESO A WISHLIST COMPARTIDA - DOS TIPOS
-  /wishlists/public/{public_token}:
-    get:
-      summary: Acceder a wishlist pública
-      description: Accede a una wishlist compartida públicamente (modo simple)
-      parameters:
-        - name: public_token
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Wishlist pública obtenida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/PublicWishlistView'
-
-  /wishlists/collaborative/{collaborative_token}:
-    get:
-      summary: Acceder a wishlist colaborativa
-      description: Accede a una wishlist en modo colaborativo (con controls y analytics)
-      parameters:
-        - name: collaborative_token
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Wishlist colaborativa obtenida
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CollaborativeWishlistView'
-
-    post:
-      summary: Registrar interacción colaborativa
-      description: Registra una visualización o interacción con la wishlist colaborativa
-      parameters:
-        - name: collaborative_token
           in: path
           required: true
           schema:
             type: string
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                action:
-                  type: string
-                  enum: [view, share, save]
-                  example: "view"
+              $ref: '#/components/schemas/ShareWishlistRequest'
       responses:
         '200':
-          description: Interacción registrada
+          description: Configuración actualizada exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: Wishlist no encontrada
+
+    delete:
+      summary: Desactivar sharing
+      description: Desactiva el sharing de la wishlist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: wishlist_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sharing desactivado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '404':
+          description: Wishlist no encontrada
+
+  # ESTADÍSTICAS DE SHARING
+  /wishlists/{wishlist_id}/share/stats:
+    get:
+      summary: Obtener estadísticas de sharing
+      description: Retorna las estadísticas de uso del enlace compartido
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: wishlist_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Estadísticas obtenidas exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShareStats'
+        '404':
+          description: Wishlist no encontrada o no compartida
+
+  # ACCESO A WISHLIST COMPARTIDA
+  /wishlists/shared/{share_token}:
+    get:
+      summary: Acceder a wishlist compartida
+      description: Accede a una wishlist compartida usando el token
+      parameters:
+        - name: share_token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Wishlist compartida obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SharedWishlistView'
+        '404':
+          description: Enlace no encontrado o expirado
+        '410':
+          description: Límite de visualizaciones alcanzado
+
+  # COMENTARIOS EN WISHLIST COMPARTIDA
+  /wishlists/shared/{share_token}/comments:
+    get:
+      summary: Obtener comentarios
+      description: Retorna los comentarios de la wishlist compartida
+      parameters:
+        - name: share_token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Comentarios obtenidos exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentList'
+        '404':
+          description: Enlace no encontrado
+
+    post:
+      summary: Añadir comentario
+      description: Añade un comentario a la wishlist compartida (si está permitido)
+      parameters:
+        - name: share_token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddCommentRequest'
+      responses:
+        '201':
+          description: Comentario añadido exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+        '400':
+          description: Los comentarios no están permitidos en esta wishlist
+        '404':
+          description: Enlace no encontrado
